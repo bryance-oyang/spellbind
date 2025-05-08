@@ -19,6 +19,7 @@ void bench()
 
 int main()
 {
+	run_test("arithmetic", test_arithmetic);
 	run_test("b64", test_b64);
 	run_test("dhkx", test_dhkx);
 	run_test("ecc", test_ecc);
@@ -28,7 +29,6 @@ int main()
 	run_test("rsa", test_rsa);
 	run_test("sha3", test_sha3);
 	run_test("big_serialize", test_big_serialize);
-	run_test("arithmetic", test_arithmetic);
 
 	bench();
 	printf("\nAll tests passed!\n");

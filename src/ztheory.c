@@ -752,8 +752,8 @@ enum SPELL_RET z_find_prime(struct big *prime, const struct big *start)
 				goto cont;
 			}
 		}
-		printf(".");
-		fflush(stdout);
+		//printf(".");
+		//fflush(stdout);
 
 		SPELL(z_miller_rabin_montgomery(&is_prime, prime, m, d, Rad, MILLER_RABIN_THOROUGH_NITER, &rng), retval, out);
 		if (is_prime) {
@@ -767,7 +767,7 @@ cont:
 	}
 
 out:
-	printf("\n");
+	//printf("\n");
 	MONTGOMERY_FREE(m, err_m);
 	BIG_FREE(two, err_two);
 	BIG_FREE(Rad, err_Rad);
@@ -825,24 +825,24 @@ enum SPELL_RET z_find_safe_prime(struct big *prime, const struct big *start)
 				goto cont;
 			}
 		}
-		printf(".");
-		fflush(stdout);
+		//printf(".");
+		//fflush(stdout);
 
 		/* brief check half for prime */
 		SPELL(z_miller_rabin_montgomery(&is_prime, half, m, d, Rad, 1, &rng), retval, out);
 		if (!is_prime) {
 			goto cont;
 		}
-		printf("+");
-		fflush(stdout);
+		//printf("+");
+		//fflush(stdout);
 
 		/* half is likely prime already */
 		SPELL(z_miller_rabin_montgomery(&is_prime, prime, m, d, Rad, 1, &rng), retval, out);
 		if (!is_prime) {
 			goto cont;
 		}
-		printf("+");
-		fflush(stdout);
+		//printf("+");
+		//fflush(stdout);
 
 		/* thorough half */
 		SPELL(z_miller_rabin_montgomery(&is_prime, half, m, d, Rad, MILLER_RABIN_THOROUGH_NITER, &rng), retval, out);
@@ -865,7 +865,7 @@ cont:
 	}
 
 out:
-	printf("\n");
+	//printf("\n");
 	MONTGOMERY_FREE(m, err_m);
 	BIG_FREE(half, err_half);
 	BIG_FREE(twelve, err_twelve);

@@ -1091,6 +1091,60 @@ out:
 	return retval;
 }
 
+struct karatsuba_ctx *karatsuba_ctx_alloc(void)
+{
+	struct karatsuba_ctx *ctx;
+
+	if ((ctx = malloc(sizeof(*ctx))) == NULL) {
+		goto err_ctx;
+	}
+
+	for (int64_t i = 0; i < KARATSUBA_MAX_DEPTH; i++) {
+		for (int64_t j = 0; j < KARATSUBA_NSCRATCH; j++) {
+			ctx->z[i][j] = NULL;
+		}
+	}
+
+	for (int64_t i = 0; i < KARATSUBA_MAX_DEPTH; i++) {
+		for (int64_t j = 0; j < KARATSUBA_NSCRATCH; j++) {
+			if ((ctx->z[i][j] = big_alloc()) == NULL) {
+				goto err_z;
+			}
+		}
+	}
+
+	if ((ctx->scratch = big_alloc()) == NULL) {
+		goto err_scratch;
+	}
+
+	return ctx;
+
+	big_free(ctx->scratch);
+err_scratch:
+err_z:
+	for (int64_t i = 0; i < KARATSUBA_MAX_DEPTH; i++) {
+		for (int64_t j = 0; j < KARATSUBA_NSCRATCH; j++) {
+			if (ctx->z[i][j] != NULL) {
+				big_free(ctx->z[i][j]);
+			}
+		}
+	}
+	free(ctx);
+err_ctx:
+	return NULL;
+}
+
+void karatsuba_ctx_free(struct karatsuba_ctx *ctx)
+{
+	big_free(ctx->scratch);
+	for (int64_t i = 0; i < KARATSUBA_MAX_DEPTH; i++) {
+		for (int64_t j = 0; j < KARATSUBA_NSCRATCH; j++) {
+			big_free(ctx->z[i][j]);
+		}
+	}
+	free(ctx);
+}
+
 static enum SPELL_RET big_karatsuba_split(struct big *restrict a1, struct big *restrict a0, const struct big *restrict a, int64_t lower_len)
 {
 	enum SPELL_RET retval = SPELL_SUCCESS;
@@ -1107,13 +1161,23 @@ static enum SPELL_RET big_karatsuba_split(struct big *restrict a1, struct big *r
 	for (int64_t i = 0; i < a0->len; i++) {
 		a0->x[i] = a->x[i];
 	}
-
 	big_fixlenzero(a0);
 out:
 	return retval;
 }
 
-static enum SPELL_RET big_mul_karatsuba(struct big *result, const struct big *a, const struct big *b)
+static enum SPELL_RET karatsuba_base(struct big *result, const struct big *a,
+	const struct big *b, struct karatsuba_ctx *ctx)
+{
+	enum SPELL_RET retval = SPELL_SUCCESS;
+	SPELL(big_mul_restrict(ctx->scratch, a, b), retval, out);
+	SPELL(big_copy(result, ctx->scratch), retval, out);
+out:
+	return retval;
+}
+
+static enum SPELL_RET karatsuba_recurse(struct big *result, const struct big *a,
+	const struct big *b, int32_t depth, struct karatsuba_ctx *ctx)
 {
 	if (a->len > b->len) {
 		big_swp(&a, &b);
@@ -1121,50 +1185,52 @@ static enum SPELL_RET big_mul_karatsuba(struct big *result, const struct big *a,
 		big_decoy_swp(&a, &b);
 	}
 
+	enum SPELL_RET retval = SPELL_SUCCESS;
 	int64_t lower_len = a->len / 2;
-	if (lower_len < 8) {
-		return big_mul_unrestricted(result, a, b);
+	if (lower_len < KARATSUBA_BASE_LEN || depth == KARATSUBA_MAX_DEPTH) {
+		return karatsuba_base(result, a, b, ctx);
 	}
 
-	enum SPELL_RET retval = SPELL_SUCCESS;
-	struct big *a0, *a1, *b0, *b1, *c0, *c1, *c2;
-	BIG_ALLOC(a0, retval, err_a0);
-	BIG_ALLOC(a1, retval, err_a1);
-	BIG_ALLOC(b0, retval, err_b0);
-	BIG_ALLOC(b1, retval, err_b1);
-	BIG_ALLOC(c0, retval, err_c0);
-	BIG_ALLOC(c1, retval, err_c1);
-	BIG_ALLOC(c2, retval, err_c2);
+	/*
+	 * 0: a0
+	 * 1: a1
+	 * 2: b0
+	 * 3: b1
+	 * 4: c0
+	 * 5: c1
+	 * 6: c2
+	 */
+	SPELL(big_karatsuba_split(ctx->z[depth][1], ctx->z[depth][0], a, lower_len), retval, out);
+	SPELL(big_karatsuba_split(ctx->z[depth][3], ctx->z[depth][2], b, lower_len), retval, out);
 
-	SPELL(big_karatsuba_split(a1, a0, a, lower_len), retval, out);
-	SPELL(big_karatsuba_split(b1, b0, b, lower_len), retval, out);
-
-	SPELL(big_mul_karatsuba(c0, a0, b0), retval, out);
-	SPELL(big_mul_karatsuba(c2, a1, b1), retval, out);
+	SPELL(karatsuba_recurse(ctx->z[depth][4], ctx->z[depth][0], ctx->z[depth][2], depth + 1, ctx), retval, out);
+	SPELL(karatsuba_recurse(ctx->z[depth][6], ctx->z[depth][1], ctx->z[depth][3], depth + 1, ctx), retval, out);
 
 	/* c1 = (a0 + a1) * (b0 + b1) */
-	SPELL(big_add(a0, a0, a1), retval, out);
-	SPELL(big_add(b0, b0, b1), retval, out);
-	SPELL(big_mul_karatsuba(c1, a0, b0), retval, out);
+	SPELL(big_add(ctx->z[depth][0], ctx->z[depth][0], ctx->z[depth][1]), retval, out);
+	SPELL(big_add(ctx->z[depth][2], ctx->z[depth][2], ctx->z[depth][3]), retval, out);
+	SPELL(karatsuba_recurse(ctx->z[depth][5], ctx->z[depth][0], ctx->z[depth][2], depth + 1, ctx), retval, out);
 
-	SPELL(big_sub(c1, c1, c2), retval, out);
-	SPELL(big_sub(c1, c1, c0), retval, out);
+	SPELL(big_sub(ctx->z[depth][5], ctx->z[depth][5], ctx->z[depth][6]), retval, out);
+	SPELL(big_sub(ctx->z[depth][5], ctx->z[depth][5], ctx->z[depth][4]), retval, out);
 
-	SPELL(big_lshift(c2, c2, 2 * BIG_XBITS * lower_len), retval, out);
-	SPELL(big_lshift(c1, c1, BIG_XBITS * lower_len), retval, out);
+	SPELL(big_lshift(ctx->z[depth][6], ctx->z[depth][6], 2 * BIG_XBITS * lower_len), retval, out);
+	SPELL(big_lshift(ctx->z[depth][5], ctx->z[depth][5], BIG_XBITS * lower_len), retval, out);
 
-	SPELL(big_add(result, c0, c1), retval, out);
-	SPELL(big_add(result, result, c2), retval, out);
+	SPELL(big_add(result, ctx->z[depth][4], ctx->z[depth][5]), retval, out);
+	SPELL(big_add(result, result, ctx->z[depth][6]), retval, out);
 
 out:
-	BIG_FREE(c2, err_c2);
-	BIG_FREE(c1, err_c1);
-	BIG_FREE(c0, err_c0);
-	BIG_FREE(b1, err_b1);
-	BIG_FREE(b0, err_b0);
-	BIG_FREE(a1, err_a1);
-	BIG_FREE(a0, err_a0);
 	return retval;
+}
+
+/**
+ * Unfortunately this function is currently slower than the default simple multiplication
+ */
+enum SPELL_RET big_mul_karatsuba(struct big *result, const struct big *a,
+	const struct big *b, struct karatsuba_ctx *ctx)
+{
+	return karatsuba_recurse(result, a, b, 0, ctx);
 }
 
 enum SPELL_RET big_from_uint(struct big *restrict b, const uint64_t x)

@@ -1,9 +1,6 @@
 /**
  * @file
  * @brief Command line utility for temporarily decrypting to ephemeral file.
- *
- * Encrypted file format:
- * 	ecc(concat(mist header, ciphertext))
  */
 
 #include "common.h"
@@ -66,8 +63,7 @@ static void key_free(uint8_t *key, uint64_t key_nbytes)
 }
 
 static int decrypt_cipher_file(const char *plain_fname, const char *cipher_fname,
-	const char *key_fname, const uint8_t *passwd, uint64_t passwd_nbytes,
-	struct quirky_rng *rng)
+	const char *key_fname, const uint8_t *passwd, uint64_t passwd_nbytes)
 {
 	int retval = 0;
 	enum SPELL_RET spell_ret;
@@ -125,9 +121,6 @@ err_mist_deserial:
 err_mist:
 	fmap_destroy(&cipher_fmap);
 err_fmap_cipher:
-	if (retval != 0) {
-		erase_file(plain_fname, rng);
-	}
 	fflush(stderr);
 	return retval;
 }
@@ -202,9 +195,9 @@ err_fmap_plain:
 	return retval;
 }
 
-const char *usage = "Usage: demistephy [-p] [-s seed_fname] key_fname cipher_fname plain_fname\n"
+const char *usage = "Usage: wisp [-p] [-s seed_fname] key_fname cipher_fname plain_fname\n"
 	"\t-p\n\t\tUse password\n\n"
-	"\t-s seed_fname\n\t\tUse seed_fname as a seed for the random number generator\n"
+	"\t-s seed_fname\n\t\tUse seed_fname as a seed for the random number generator\n\n"
 	"\t-d\n\t\tFor device files: limit number of bytes read from seed_fname to compiled security level\n";
 char *seed_fname_arg = NULL;
 char *key_fname_arg = NULL;
@@ -284,6 +277,7 @@ int main(int argc, char **argv)
 	uint8_t salt[SALTLEN];
 	struct quirky_rng *rng;
 	bool urandom_exists, plain_file_exists, cipher_file_exists;
+	struct timespec bench;
 
 	urandom_exists = (access(urandom_fname, F_OK) == 0);
 	plain_file_exists = (access(plain_fname, F_OK) == 0);
@@ -382,12 +376,24 @@ int main(int argc, char **argv)
 		printf("decrypting %s -> %s...\n", cipher_fname, plain_fname);
 		fflush(stdout);
 
-		if (decrypt_cipher_file(plain_fname, cipher_fname, key_fname, passwd, passwd_len, rng) != 0) {
+		struct stat sb_cipher;
+		if (stat(cipher_fname, &sb_cipher) != 0) {
+			retval = -1;
+			fprintf(stderr, "error: failed to stat cipher file %s\n", cipher_fname);
+			fflush(stderr);
+			goto err_decrypt;
+		}
+
+		bench_start(&bench);
+		if (decrypt_cipher_file(plain_fname, cipher_fname, key_fname, passwd, passwd_len) != 0) {
 			retval = -1;
 			fprintf(stderr, "error: failed to decrypt cipher file %s to plain file %s\n", cipher_fname, plain_fname);
 			fflush(stderr);
 			goto err_decrypt;
 		}
+		double dt = bench_end(&bench);
+		printf("finished decrypting in %.3g sec (%.3g MB/sec)\n", dt, sb_cipher.st_size / (dt * 1e6));
+		fflush(stdout);
 	} else {
 		printf("creating new cipher file at %s...\n", cipher_fname);
 		fflush(stdout);
@@ -447,12 +453,18 @@ int main(int argc, char **argv)
 	if (sb_after.st_mtime > sb_before.st_mtime || !cipher_file_exists) {
 		printf("\nencrypting %s -> %s...\n", plain_fname, cipher_fname);
 		fflush(stdout);
+
+		bench_start(&bench);
 		if (encrypt_cipher_file(plain_fname, tmp_cipher_file.fname, key_fname, passwd, passwd_len, rng) != 0) {
 			retval = -1;
 			fprintf(stderr, "error: failed to encrypt %s -> %s\n", plain_fname, tmp_cipher_file.fname);
 			fflush(stderr);
 			goto err_finalize;
 		}
+		double dt = bench_end(&bench);
+		printf("finished encrypting in %.3g sec (%.3g MB/sec)\n", dt, sb_after.st_size / (dt * 1e6));
+		fflush(stdout);
+
 		if (rename(tmp_cipher_file.fname, cipher_fname) != 0) {
 			retval = -1;
 			fprintf(stderr, "error: failed to rename %s -> %s\n", tmp_cipher_file.fname, cipher_fname);
@@ -469,7 +481,6 @@ int main(int argc, char **argv)
 
 err_finalize:
 err_sig:
-	erase_file(plain_fname, rng);
 	if (retval != 0 && !cipher_file_exists) {
 		/* file was created by this program since it didn't exist, but we have error so delete it */
 		unlink(cipher_fname);

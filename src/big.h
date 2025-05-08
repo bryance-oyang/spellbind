@@ -24,6 +24,15 @@ struct big {
 	volatile bool neg;
 };
 
+#define KARATSUBA_MAX_DEPTH 4
+#define KARATSUBA_NSCRATCH 7
+#define KARATSUBA_BASE_LEN 8
+
+struct karatsuba_ctx {
+	struct big *z[KARATSUBA_MAX_DEPTH][KARATSUBA_NSCRATCH];
+	struct big *scratch;
+};
+
 /** erase secrets */
 static void big_erase(struct big *restrict b)
 {

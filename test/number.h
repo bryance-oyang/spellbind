@@ -119,47 +119,70 @@ void test_pow()
 
 void test_arithmetic()
 {
-	int64_t A = 73;
-	int64_t B = 13;
-	//int64_t C;
-	//int64_t R;
-
+	uint64_t A;
+	uint64_t B;
+	uint64_t C, D;
 	struct big *a = big_alloc();
 	struct big *b = big_alloc();
 	struct big *c = big_alloc();
 	struct big *r = big_alloc();
 
-	big_from_uint(a, A);
-	//a->neg = true;
-	//A = -A;
-	big_from_uint(b, B);
-	const char *s = "zzzzzzzzzzzzzzzz";
-	big_from_str(c, (uint8_t *)s, strlen(s));
-	//b->neg = true;
-	//B = -B;
+	for (A = 0; A < 100; A++) {
+		for (B = 0; B < 100; B++) {
+			big_from_uint(a, A);
+			big_from_uint(b, B);
 
-	//C = A + B;
-	//R = A % B;
-	//big_add(c, a, b);
+			C = A + B;
+			big_add(c, a, b);
+			big_to_uint(&D, c);
 
-	printb(A);
-	printf("\n");
-	big_print2(a);
-	printf("\n");
-	printb(B);
-	printf("\n");
-	big_print2(b);
-	printf("\n");
-	//printb(C);
-	printf("\n");
-	big_print2(c);
-	printf("\n");
-	//printb(R);
-	//printf("\n");
-	big_print2(r);
-	printf("\n");
-	big_print10(r);
-	printf("\n");
+			assert(C == D);
+		}
+	}
+
+	for (A = 0; A < 100; A++) {
+		for (B = 0; B < A; B++) {
+			big_from_uint(a, A);
+			big_from_uint(b, B);
+
+			C = A - B;
+			big_sub(c, a, b);
+			big_to_uint(&D, c);
+
+			assert(C == D);
+		}
+	}
+
+	struct karatsuba_ctx *ctx = karatsuba_ctx_alloc();
+	for (A = 0; A < 100; A++) {
+		for (B = 0; B < 100; B++) {
+			big_from_uint(a, A);
+			big_from_uint(b, B);
+
+			C = A * B;
+			big_mul_karatsuba(c, a, b, ctx);
+			big_to_uint(&D, c);
+
+			assert(C == D);
+		}
+	}
+	karatsuba_ctx_free(ctx);
+
+	for (A = 0; A < 100; A++) {
+		for (B = 1; B < 100; B++) {
+			big_from_uint(a, A);
+			big_from_uint(b, B);
+
+			C = A / B;
+			big_abs_div(c, r, a, b);
+
+			big_to_uint(&D, c);
+			assert(C == D);
+
+			big_to_uint(&D, r);
+			assert(A % B == D);
+		}
+	}
 
 	big_free(a);
 	big_free(b);

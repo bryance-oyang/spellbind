@@ -11,4 +11,5 @@ perf.*
 a.out
 .vscode
 app/mint_key/mint_key
-app/demistephy/demistephy
+app/wisp/wisp
+app/dh4096/dh4096

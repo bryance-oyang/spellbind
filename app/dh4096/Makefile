@@ -1,4 +1,4 @@
-EXEC=demistephy
+EXEC=dh4096
 srcdir=
 
 SHELL=/bin/sh
@@ -8,7 +8,7 @@ CFLAGS+=-std=c99 -Wall -Wextra -Wpedantic -Wdouble-promotion -Wformat=2 -Wformat
 	-Wnull-dereference -Wmissing-include-dirs -Wunused -Wuninitialized -Wstringop-truncation \
 	-Walloc-zero -Wduplicated-branches -Wduplicated-cond -Wshadow -Wundef -Wunused-macros \
 	-Wcast-qual -Wcast-align -Wlogical-op -Wmissing-declarations \
-	-Wredundant-decls -Wlto-type-mismatch
+	-Wredundant-decls -Wlto-type-mismatch -Wno-unused-function
 LDFLAGS=-lc
 PFLAGS=-ggdb3
 DFLAGS=$(CFLAGS) -MM -MT

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -35,33 +36,6 @@ static void erase_buf(volatile uint8_t *buf, uint64_t buf_nbytes)
 	for (uint64_t i = 0; i < buf_nbytes; i++) {
 		buf[i] = 0;
 	}
-}
-
-/* used for cleanup and will not give errors */
-static void erase_file(const char *fname, struct quirky_rng *rng)
-{
-	int fd;
-	uint8_t *map;
-	struct stat sb;
-
-	if ((fd = open(fname, O_RDWR)) < 0) {
-		goto err_open;
-	}
-	if (fstat(fd, &sb) != 0) {
-		goto err_stat;
-	}
-	if ((map = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)) == NULL) {
-		goto err_mmap;
-	}
-	quirky_rng_rand_bytes(map, sb.st_size, rng);
-	msync(map, sb.st_size, MS_SYNC | MS_INVALIDATE);
-	munmap(map, sb.st_size);
-	fsync(fd);
-err_mmap:
-err_stat:
-	close(fd);
-err_open:
-	return;
 }
 
 static int create_file(const char *fname)
@@ -332,6 +306,27 @@ static int get_passwd(uint8_t *passwd_buf, uint64_t buf_nbytes)
 err:
 	fflush(stderr);
 	return retval;
+}
+
+static void bench_start(struct timespec *bench_start_time)
+{
+#ifndef CLOCK_MONOTONIC_RAW
+	clock_gettime(CLOCK_REALTIME, bench_start_time);
+#else /* CLOCK_MONOTONIC_RAW */
+	clock_gettime(CLOCK_MONOTONIC_RAW, bench_start_time);
+#endif /* CLOCK_MONOTONIC_RAW */
+}
+
+static double bench_end(struct timespec *bench_start_time)
+{
+	struct timespec bench_end_time;
+#ifndef CLOCK_MONOTONIC_RAW
+	clock_gettime(CLOCK_REALTIME, &bench_end_time);
+#else /* CLOCK_MONOTONIC_RAW */
+	clock_gettime(CLOCK_MONOTONIC_RAW, &bench_end_time);
+#endif /* CLOCK_MONOTONIC_RAW */
+	return (double)(bench_end_time.tv_sec - bench_start_time->tv_sec)
+		+ (double)(bench_end_time.tv_nsec - bench_start_time->tv_nsec) / 1e9;
 }
 
 #endif /* COMMON_H */

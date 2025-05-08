@@ -99,6 +99,7 @@ goto_label: \
  *
  */
 struct big;
+struct karatsuba_ctx;
 struct big *big_alloc(void);
 void big_free(struct big *restrict b);
 #define BIG_ALLOC(b, retval, goto_label) SPELL_ALLOC(big_alloc, b, retval, goto_label)
@@ -140,6 +141,9 @@ enum SPELL_RET big_add(struct big *result, const struct big *a, const struct big
 enum SPELL_RET big_sub(struct big *result, const struct big *a, const struct big *b);
 enum SPELL_RET big_mul_restrict(struct big *restrict result, const struct big *a, const struct big *b);
 enum SPELL_RET big_mul_unrestricted(struct big *result, const struct big *a, const struct big *b);
+struct karatsuba_ctx *karatsuba_ctx_alloc(void);
+void karatsuba_ctx_free(struct karatsuba_ctx *ctx);
+enum SPELL_RET big_mul_karatsuba(struct big *result, const struct big *a, const struct big *b, struct karatsuba_ctx *ctx);
 enum SPELL_RET big_from_uint(struct big *restrict b, const uint64_t x);
 void big_to_uint(uint64_t *restrict x, const struct big *restrict b);
 enum SPELL_RET big_from_str(struct big *restrict b, const uint8_t *restrict s, int64_t sbytes);

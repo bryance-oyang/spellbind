@@ -8,17 +8,15 @@ static void dh_bench()
 	struct big *private_e, *public;
 	private_e = big_alloc();
 	public = big_alloc();
-	char *seed = "hi";
 	struct dh_param *dh_param = dh_param_alloc();
 	struct quirky_rng *rng = quirky_rng_alloc();
 	quirky_rng_init(rng);
-	quirky_rng_add_entropy(rng, (uint8_t *)seed, strlen(seed));
 
 	bench_start();
 #ifdef DEBUG
 	dh_param_init(dh_param, 64, rng);
 #else /* DEBUG */
-	dh_param_init(dh_param, 1024, rng);
+	dh_param_init(dh_param, 512, rng);
 #endif /* DEBUG */
 	bench_end("dh_param: %g ms\n");
 

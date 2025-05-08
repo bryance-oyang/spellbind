@@ -14,7 +14,7 @@
 
 const char *usage = "Usage: mint_key [-p] [-s seed_fname] key_fname\n"
 	"\t-p\n\t\tUse additional entropy from keyboard\n\n"
-	"\t-s seed_fname\n\t\tUse seed_fname as a seed for the random number generator\n"
+	"\t-s seed_fname\n\t\tUse seed_fname as a seed for the random number generator\n\n"
 	"\t-d\n\t\tFor device files: limit number of bytes read from seed_fname to compiled security level\n";
 char *seed_fname_arg = NULL;
 char *key_fname_arg = NULL;

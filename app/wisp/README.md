@@ -1,10 +1,9 @@
-# demistephy
-Temporary decryption into ephemeral file. Ciphertext file is encoded with
-error correcting code and verified with message authentication code.
+# wisp
+Temporary decryption into ephemeral file.
 
 1. `make`
 2. create base64 `key_file` (e.g. with `mint_key`)
-3. `./demistephy key_file cipher_file plain_file`
+3. `./wisp key_file cipher_file plain_file`
 4. read/write `plain_file` to heart's content
 5. `ctrl-c` to save ciphertext into `cipher_file`
 
