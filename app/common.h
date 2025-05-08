@@ -56,6 +56,18 @@ static int create_file(const char *fname)
 	return 0;
 }
 
+/* returns true if fname is a regular file */
+static bool is_regular_file(const char *fname)
+{
+	struct stat sb;
+
+	if (stat(fname, &sb) != 0) {
+		return false;
+	}
+
+	return S_ISREG(sb.st_mode);
+}
+
 struct fmap {
 	bool read_only;
 	uint8_t *map;

@@ -265,7 +265,7 @@ int main(int argc, char **argv)
 	const char *const cipher_fname = cipher_fname_arg;
 	const char *const plain_fname = plain_fname_arg;
 
-	if (access(key_fname, R_OK) != 0) {
+	if (access(key_fname, R_OK) != 0 || !is_regular_file(key_fname)) {
 		fprintf(stderr, "error: key file not readable at %s\n", key_fname);
 		fflush(stderr);
 		return -1;
@@ -282,6 +282,11 @@ int main(int argc, char **argv)
 	urandom_exists = (access(urandom_fname, F_OK) == 0);
 	plain_file_exists = (access(plain_fname, F_OK) == 0);
 	cipher_file_exists = (access(cipher_fname, F_OK) == 0);
+	if (cipher_file_exists && !is_regular_file(cipher_fname)) {
+		fprintf(stderr, "error: cipher file not a regular file at %s\n", cipher_fname);
+		fflush(stderr);
+		return -1;
+	}
 
 	if (!urandom_exists) {
 		printf("warning: /dev/urandom doesn't exist\n");
